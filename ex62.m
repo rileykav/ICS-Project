@@ -1,97 +1,189 @@
-1;
+
+% -------------- FUNCTIONS --------------
+
+    % Defining g(u, delta_t, gamma) function to be called in the recursive relation
+    1;
+
+    function g_vec=g_funct(u, delta_t, gamma_val)
+
+        g_vec = u + delta_t * gamma_val*(u.*(1-u));
+
+    endfunction
+
+% -------------- MAIN CODE --------------
+
+    % Defining parameters of the simulation: tmax = maximum time, delta_x = space step-size
+    % d_val = diffusion coefficient, gamma_val = reaction coefficient
+
+    t_max = 1;
+    delta_x = 0.01;
+    d_val = 0.001;
+    gamma_val = 5;
+
+    % Find number of steps in space N and create vector x with values in space in [0,1] 
+
+    N = 1 + 1/delta_x
+    x = linspace(0,1,N);
+
+    % Define matrix D3 that computes third order time deivative with OBC and compute the
+    % square roots with sqrtm function
+
+    a = 0.5;
+    b = -1;
+    c = 1;
+    D3= diag(a*ones(1,N-2),2) + diag(b*ones(1,N-1),1) + diag(c*ones(1,N-1),-1) + diag((-a)*ones(1,N-2),-2) + diag((-a)*ones(1,2), N-2) + diag((a)*ones(1,2), 2-N) + diag(c*ones(1,1), N-1) + diag((-c)*ones(1,1), 1-N)
+    D3 = D3/(delta_x^3)
+    D3sq = sqrtm(D3)
+    D3sqmin = sqrtm(-D3)
+
+    % Define matrix D (=D2) that computes second order time deivative with OBC
+
+    a = -2;
+    b = 1;
+    c = 1;
+    D2 = diag(a*ones(1,N)) + diag(b*ones(1,N-1),1) + diag(c*ones(1,N-1),-1);
+    D2(1,N)=1;
+    D2(N,1)=1;
+    D2 = D2/(delta_x)^2;
+
+    % Impose initial condition
+
+    u_initial = zeros(N,1);
+
+    for i=1:N
+        u_initial(i) = exp(-50*(x(i)-1/2)^2);
+    end
+
+    % Fix number of time-steps t_interval and compute vector t with values of time in [0,t_max]
+
+    t_interval = 500;
+    t = linspace(0,t_max,t_interval)
+    delta_t = t_max/(t_interval-1)
+
+    % Implement recursive relation in time to find the solution u_approx
+
+    u_approx=zeros(N,size(t)(2));
+
+    u_approx(:,1) = u_initial;
+
+    for j=1:(size(t)(2)-1);
+
+        % Solution with D3 and OBC
+
+            % A = -d_val*(D3sq+D3sqmin)/sqrt(2);
+
+            % A = eye(N) - delta_t*A;
+
+        % Solution with D2 and OBC
+
+            A = eye(N) - delta_t*d_val*(D2);
+
+        u_approx(:,j+1) = A\g_funct(u_approx(:,j), delta_t, gamma_val);
+
+    end
+
+% -------------- PLOTS --------------
+
+    % Plot for a bunch of different times with colour map
+
+    listoftimes = [];
+
+    time_intervals = 10;
+
+    delta_tint = floor(t_interval/time_intervals)
+
+    listoftimes(1) = delta_tint;
 
 
-delta_x=0.01;
-T=1;
-Nt=10;
-d=0.001;
-gamma_const=5;
-delta_t=T/(Nt-1);
-Nx=int32(1+(1/delta_x));
-t=linspace(0,T,Nt);
-x=linspace(0,1,Nx);
+    for i=2:time_intervals;
+        listoftimes(i) = listoftimes(i-1) + delta_tint;
+    end
+
+    listoftimes
+    size(listoftimes)(2)
+
+    clf
+    hold on 
+
+        cmap=colormap();
+    for ti=1:size(listoftimes)(2)
+        tau=listoftimes(ti)
+        colour_i=round(1+(tau*63/(t_interval)));
+        plot(x, u_approx(:,tau),'Color', color=cmap(colour_i,:),'linewidth',2)
+        axis([0 1 0 1])
+    end
+
+    xlabel('x');
+    ylabel('u');
+    h=get(gcf, "currentaxes");
+    set(h, "fontsize", 12, "linewidth", 1);
+    cbar=colorbar();
+    caxis([0,t_max]);
+    ylabel(cbar,'t','Rotation',0);
+    title(sprintf('IMEX \\Deltax=%d, T=%d, Nt=%d', delta_x, t_max, t_interval));
+    filename=sprintf('plots_6.2/Ex62multit_Nt=%d_D2.png',t_interval);
+    % title(sprintf('EXPM, D^{3/2}=-(-D^3)^{1/2}) \\Delta x=%d, T=%d, Nt=%d', delta_x, T, Nt));
+    % filename=sprintf('Ex61/Ex61-EXPM-minusDer-multi-t-delx=%d.png',delta_x);
+    % title(sprintf('EXPM, D^{3/2}=-((D^3)^{1/2}+(-D^3)^{1/2})/sqrt(2) \\Delta x=%d, T=%d, Nt=%d', delta_x, T, Nt));
+    % filename=sprintf('Ex61/Ex61-EXPM-mixedDer-multi-t-delx=%d.png',delta_x);
+    print(1,filename, '-dpng','-S600,400')
 
 
+    % Print in time for a bunch of space points
+
+    clf
+    hold on 
+
+    cmap=colormap();
+    listofspace=1
+    for xi=1:6
+
+        colour_i=round((listofspace*63/(N/2)))
+        plot(t, u_approx(listofspace,:),'Color', color=cmap(colour_i,:),'linewidth',2)
+
+        axis([0 1 0 1])
+
+        listofspace = listofspace + (N-1)/10
+    end
+
+    xlabel('t');
+    ylabel('u');
+    h=get(gcf, "currentaxes");
+    set(h, "fontsize", 12, "linewidth", 1);
+    cbar=colorbar();
+    caxis([0,0.5]);
+    ylabel(cbar,'t','Rotation',0);
+    title(sprintf('IMEX \\Deltax=%d, T=%d, Nt=%d', delta_x, t_max, t_interval));
+    filename=sprintf('plots_6.2/Ex62multix_Nt=%d_first1_D2.png',t_interval);
+    print(1,filename, '-dpng','-S600,400')
 
 
-der_a=0;
-der_b=-1;
-der_c=1;
-der_d=-1/2;
-der_f=1/2;
-D3 = diag(der_a*ones(1,Nx)) + diag(der_b*ones(1,Nx-1),1) +diag(der_f*ones(1,Nx-2),2)+diag(der_d*ones(1,Nx-2),-2)+ diag(der_c*ones(1,Nx-1),-1);
-D3(1,Nx)=der_c;
-D3(1,Nx-1)=der_d;
-D3(2,Nx)=der_d;
-D3(Nx,1)=der_b;
-D3(Nx,2)=der_f;
-D3(Nx-1,1)=der_f;
-% D3=D3/(delta_x^2);
-D3;
-D3over2=sqrtm(sqrtm(D3^2 / delta_x^3));
-D3minusover2=sqrtm(-D3 / delta_x^3);
-% D3over2=(D3over2 + D3over2minus)/(sqrt(2))
+    clf
+    hold on 
+
+    cmap=colormap();
+
+    listofspace = 51
+
+    for xi=1:6
+
+        colour_i=round(((listofspace-50)*63/(N/2)))
+        plot(t, u_approx(listofspace,:),'Color', color=cmap(colour_i,:),'linewidth',2)
+
+        axis([0 1 0 1])
+
+        listofspace = listofspace + (N-1)/10
+    end
+
+    xlabel('t');
+    ylabel('u');
+    h=get(gcf, "currentaxes");
+    set(h, "fontsize", 12, "linewidth", 1);
+    cbar=colorbar();
+    caxis([0.5,1]);
+    ylabel(cbar,'x','Rotation',0);
+    title(sprintf('IMEX \\Deltax=%d, T=%d, Nt=%d', delta_x, t_max, t_interval));
+    filename=sprintf('plots_6.2/Ex62multix_Nt=%d_second_D2.png',t_interval);
+    print(1,filename, '-dpng','-S600,400')
 
 
-
-
-
-
-u_initial=zeros(Nx,1);
-for i=1:Nx
-    u_initial(i)=exp(-50*(x(i)-0.5)^2);
-end
-
-% 
-% u_exmp=zeros(Nx,Nt);
-% for i=1:Nt
-%     u_exmp(:,i)=(expm(t(i).*D3over2)*u_initial);
-% end
-% 
-% u_eulfor=zeros(Nx,Nt);
-% u_eulfor(:,1)=u_initial;
-% for i=1:Nt
-%     u_eulfor(:,i+1)=(eye(Nx)+delta_t.*D3over2)*u_eulfor(:,i);
-% end
-% 
-% u_eulback=zeros(Nx,Nt);
-% u_eulback(:,1)=u_initial;
-% for i=1:Nt
-%     A=eye(Nx)-delta_t.*D3over2;
-%     u_eulback(:,i+1)=A\u_eulfor(:,i);
-% end
-
-for i=2:Nt
-    g = u_eulfor(:,i-1) + delta_t*gamma_const*(u_eulfor(:,i-1).*(1 - u_eulfor(:,i-1)));
-    A = -(d/sqrt(2))*(D3over2 + D3minusover2);
-    u_eulfor(:,i) = (eye(Nx) - delta_t*d*D3over2)\g;
-end
-
-
-
-
-
-
-
-
-
-
-
-
-
-clf 
-hold on
-labels=[''];
-listoftimes=[3];
-% listoftimes=[10,20,30,40,50,60];
-% listoftimes=[3]
-for ti=1:size(listoftimes)(2)
-    tau=listoftimes(ti);
-%     plot(x, u_exmp(:,tau))
-    plot(x, u_eulfor(:,tau))
-%     plot(x, u_eulback(:,tau))
-    labels=[labels;sprintf("time(%d)=%d",tau,t(tau))];
-end
-legend(labels=labels)
-title(sprintf('\\Delta x=%d, T=%d, Nt=%d', delta_x, T, Nt))
-h=get(gcf, "currentaxes");
